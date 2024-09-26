@@ -1,0 +1,7 @@
+{
+    "bootstrap_servers": "<confluent url>",
+    "security_protocol": "SASL_SSL",
+    "sasl_mechanism": "PLAIN",
+    "sasl_plain_username": "<your user name>",
+    "sasl_plain_password": "<your password>"
+}

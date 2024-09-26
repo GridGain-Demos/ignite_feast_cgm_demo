@@ -1,0 +1,10 @@
+feast[snowflake,aws]==0.38.0
+pandas==2.2.2
+numpy==1.26.4
+fastapi==0.111.0
+pydantic==2.7.4
+uvicorn==0.30.1
+pyignite==0.6.1
+pygridgain==1.4.0
+feast-gridgain==1.0.0
+snowflake-connector-python==3.11.0

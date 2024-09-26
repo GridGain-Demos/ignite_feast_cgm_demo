@@ -1,0 +1,12 @@
+FROM python:3.11.7
+
+WORKDIR /app
+
+COPY requirements-producer.txt requirements-producer.txt
+RUN pip install -r requirements-producer.txt
+
+COPY src/kafka_producer.py /app/kafka_producer.py
+COPY data /app/data
+COPY config /app/config
+
+CMD ["sh", "-c", "echo 'Starting producer script' && python kafka_producer.py --parquet-file-path data/cgm_stats.parquet --env docker --kafka-topic cgm_readings"]

@@ -1,0 +1,32 @@
+version: "3"
+services:
+  ignite:
+    image: "apacheignite/ignite:2.16.0"
+    environment:
+      CONFIG_URI: file:/config/ignite-config.xml
+      IGNITE_QUIET: "false"
+      JVM_OPTS: >-
+        -Xms512m -Xmx1024m
+        -XX:+UseG1GC
+        -XX:+DisableExplicitGC
+        -XX:+AlwaysPreTouch
+        -XX:+ScavengeBeforeFullGC
+        -XX:+UseLargePagesInMetaspace
+    volumes:
+      - ./config:/config:ro
+    ports:
+      - "10800:10800"
+      - "11211:11211"
+      - "47100:47100"
+      - "47500:47500"
+      - "49112:49112"
+    networks:
+      kafka_network:
+        aliases:
+          - ignite
+      
+      
+networks:
+  kafka_network:
+    name: cgm_network
+    external: true

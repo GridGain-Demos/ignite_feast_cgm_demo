@@ -1,0 +1,26 @@
+project: cgm_ignite_feast_kafka
+registry: data/registry.db
+provider: local
+offline_store:
+    type: snowflake.offline
+    account: your_snowflake_account
+    user: your_username
+    password: your_password
+    role: ACCOUNTADMIN
+    warehouse: FEASTTEST
+    database: FEASTTEST
+batch_engine:
+    type: snowflake.engine
+    account: your_snowflake_account
+    user: your_username
+    password: your_password
+    role: ACCOUNTADMIN
+    warehouse: FEASTTEST
+    database: FEASTTEST
+online_store:
+    type: feast_gridgain.gridgain_online_store.GridGainOnlineStore
+    username: your_gridgain_username
+    password: your_gridgain_password
+    url: your_gridgain_url
+    port: 10800
+entity_key_serialization_version: 2

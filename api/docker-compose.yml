@@ -1,0 +1,20 @@
+version: "3.8"  # Use a recent Docker Compose version
+
+services:
+  feast_api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"  # Expose port 8000 from container to host
+    networks:
+      kafka_network:
+        aliases:
+          - api
+    environment:
+      - PYTHONUNBUFFERED=1
+
+networks:
+  kafka_network:
+    name: cgm_network
+    external: true

@@ -1,0 +1,48 @@
+version: '2'
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.4
+    networks: 
+      - kafka_network
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - 22181:2181
+  
+  kafka:
+    image: confluentinc/cp-kafka:7.4.4
+    depends_on:
+      - zookeeper
+    networks:
+      kafka_network:
+        aliases:
+          - kafka
+    ports:
+      - 29092:29092
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://cgm_network-kafka-1:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      # Additional configurations for consumer groups
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_GROUP_MIN_SESSION_TIMEOUT_MS: 6000
+      KAFKA_GROUP_MAX_SESSION_TIMEOUT_MS: 300000
+      # Set replication factor to 1 for single broker setup
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      # Force the creation of the __consumer_offsets topic with replication factor 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_OFFSETS_TOPIC_NUM_PARTITIONS: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_DELETE_TOPIC_ENABLE: 'true'
+
+networks:
+  kafka_network:
+    name: cgm_network
+    external: true
+
+

@@ -1,0 +1,19 @@
+version: "3.8"  # Use a recent Docker Compose version
+
+services:
+
+  kafka_historical_consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile.historicalconsumer
+    networks:
+      kafka_network:
+        aliases:
+          - kafka_historical_consumer
+    environment:
+      - PYTHONUNBUFFERED=1
+
+networks:
+  kafka_network:
+    name: cgm_network
+    external: true

@@ -1,0 +1,44 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 992382511620.dkr.ecr.us-east-1.amazonaws.com
+      - TAG="$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)"
+      - IMAGE_REPO_NAME="992382511620.dkr.ecr.us-east-1.amazonaws.com/cgm-ignite-feast-kafka"
+      - echo "TAG=$TAG"  # Print the TAG value
+      - echo "IMAGE_REPO_NAME=$IMAGE_REPO_NAME"
+
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Checking existing Docker images...
+      - docker images
+      - echo Building the Docker images...
+      - docker network create cgm_network
+      - docker-compose -p cgm_network -f api/docker-compose.yml build
+      - docker images
+      - docker tag cgm_network-feast_api:latest $IMAGE_REPO_NAME/api:$TAG  || exit 1
+      - docker-compose -p cgm_network -f kafka_producer/docker-compose.yml build
+      - docker images
+      - docker tag cgm_network-kafka_producer:latest $IMAGE_REPO_NAME/kafka-producer:$TAG  || exit 1
+      - docker-compose -p cgm_network -f kafka_consumer/docker-compose.yml build
+      - docker images
+      - docker tag cgm_network-kafka_consumer:latest $IMAGE_REPO_NAME/kafka-consumer:$TAG  || exit 1
+      - docker-compose -p cgm_network -f kafka_consumer/docker-compose-historical.yml build
+      - docker images
+      - docker tag cgm_network-kafka_historical_consumer:latest $IMAGE_REPO_NAME/kafka-historical-consumer:$TAG  || exit 1
+      - docker images
+
+  post_build:
+    commands:
+      - echo Pushing the Docker images...
+      - echo pushing $IMAGE_REPO_NAME/api:$TAG
+      - docker push $IMAGE_REPO_NAME/api:$TAG
+      - echo pushing $IMAGE_REPO_NAME/kafka-producer:$TAG
+      - docker push $IMAGE_REPO_NAME/kafka-producer:$TAG
+      - echo pushing $IMAGE_REPO_NAME/kafka-consumer:$TAG
+      - docker push $IMAGE_REPO_NAME/kafka-consumer:$TAG
+      - echo pushing $IMAGE_REPO_NAME/kafka-historical-consumer:$TAG
+      - docker push $IMAGE_REPO_NAME/kafka-historical-consumer:$TAG
+      - echo Build completed on `date`

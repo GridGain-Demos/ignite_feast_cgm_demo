@@ -1,0 +1,19 @@
+version: "3.8"  # Use a recent Docker Compose version
+
+services:
+
+  kafka_producer:
+    build:
+      context: .
+      dockerfile: Dockerfile.producer
+    networks:
+      kafka_network:
+        aliases:
+          - kafka_producer
+    environment:
+      - PYTHONUNBUFFERED=1
+
+networks:
+  kafka_network:
+    name: cgm_network
+    external: true

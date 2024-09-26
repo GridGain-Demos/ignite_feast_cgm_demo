@@ -1,0 +1,14 @@
+FROM python:3.11.7
+
+WORKDIR /app
+
+COPY requirements-consumer.txt requirements-consumer.txt
+RUN pip install --no-cache-dir -r requirements-consumer.txt
+
+COPY src/kafka_consumer.py /app/kafka_consumer.py
+COPY src/model.py /app/model.py
+COPY model /app/model
+COPY config /app/config
+
+CMD ["sh", "-c", "echo 'Starting consumer script' && python kafka_consumer.py --store offline --base-url http://cgm_network-feast_api-1:8000 --id-field subject_id --feature-service cgm_activity_v3 --env docker --kafka-topic cgm_readings --model-filepath model/glucose_prediction_model-v1.pkl"]
+
