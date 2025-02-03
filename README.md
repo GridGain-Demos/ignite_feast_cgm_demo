@@ -58,24 +58,6 @@ This project consists of the following key files and components:
 
 This project supports three environments: local, Docker, and AWS. The configuration for each environment is stored in separate files.
 
-### Configuration Files
-
-- **Feature Store**: Under the `api/repo` folder, you'll find `feature_store.yaml` files for each environment:
-  - `local/feature_store.yaml`
-  - `docker/feature_store.yaml`
-  - `aws/feature_store.yaml`
-
-- **Kafka Producer and Consumer**: Configuration files are located in the `config` folder of each component:
-  - `local_config.json`
-  - `docker_config.json`
-  - `aws_config.json`
-
-- **Dockerfiles**: Dockerfiles are located in the folder of each component, API, Producer and Consumer:
-  - For each, the environment is selected using the `--env` parameter in the Dockerfile, example:
-    ```dockerfile
-    CMD ["python", "src/kafka_consumer.py", "--env", "local"]  # or "docker" or "aws"
-    ```
-
 ### Run in Local Environment (Standalone)
 
 #### Prerequisites
@@ -102,153 +84,183 @@ This project supports three environments: local, Docker, and AWS. The configurat
     pip install feast-gridgain==1.0.0 feast==0.38.0 pandas==2.2.2 numpy==1.26.4 scikit-learn==1.5.0 joblib==1.4.2 fastapi==0.111.0 pydantic==2.7.4 uvicorn==0.30.1 aiokafka==0.10.0 kafka-python==2.0.2 pygridgain==1.4.0 pyignite==0.6.1 websockets==12.0 pyarrow==16.1.0 requests==2.32.3
     ```
 
-#### Configuration
+#### Feature Store Exploration
 
-For local development, the `feature_store.yaml` should look like this:
+This demo lets you explore Feast's feature store capabilities through the API. You only need GridGain running for this option.
 
-```yaml
-project: cgm_ignite_feast_kafka
-registry: data/registry.db
-provider: local
-online_store:
-    type: feast_gridgain.ignite_online_store.IgniteOnlineStore
-    host: localhost
-    port: 10800
-entity_key_serialization_version: 2
-```
+* **Terminal 1 - Start API Server:**
+    ```bash
+    cd api/src
+    uvicorn api:app --reload
+    ```
 
-1. **Start FastAPI Server:**
-    - Run `uvicorn api:app --reload` to start the FastAPI server for REST API access.
-      ```bash
-      cd api/src
-      uvicorn api:app --reload
-      ```
-   - Access the Swagger UI at `http://localhost:8000/docs` to explore and test the API endpoints.
-    
+After starting the API server:
+1. Open http://localhost:8000/docs
+2. Execute endpoints in this order:
+    1. `/setup` - Initialize feature store
+    2. `/get_historical_features` - Fetch from offline store
+    3. `/materialize` - Move features to online store 
+    4. `/push_stream_event` - Add sample data
+    5. `/get_online_features` - Fetch from online store
+    6. `/teardown` - Clean up when done testing
+
+For request/response examples for each endpoint, refer to the [API Documentation](#api-documentation) section.
+
+
+#### Full Data Flow Demo 
+
+This demo shows the complete pipeline with real-time glucose monitoring, demonstrating how data flows from a CGM device through Kafka to both online and offline stores.
+
+Prerequisites:
+- Running GridGain server
+- Running Kafka server
+- Kafka topic `cgm_readings` (auto-created if auto.create.topics.enable=true)
+
+Steps (Run each in numbered terminals):
+
+* **Terminal 1 - Start API Server:**
+    ```bash
+    cd api/src
+    uvicorn api:app --reload
+    ```
+    Sample Output: You should see the logs when the consumers start sending data
+    ```bash
+    {'feature': 'get_online_features', 'layer': 'api', 'event': 'store.get_online_features', 'timetaken': 26442708, 'timetakeninmicro': 26442.708, 'timetakeninmillis': 26.442708}
+    {'feature': 'get_historical_features', 'layer': 'api', 'event': 'store.get_historical_features', 'timetaken': 78534292, 'timetakeninmicro': 78534.292, 'timetakeninmillis': 78.53429200000001}
+    ```
+
+* **Terminal 2 - Start Kafka Producer:**
+    ```bash
+    cd kafka_producer
+    python src/kafka_producer.py
+    ```
+    Sample Output: You should see CGM readings being generated
+    ```bash
+    2: {'event_timestamp': 1738342404, 'subject_id': 163669001, 'glucose': 135, 'created': 1738342404}
+    ```
+
+* **Terminal 3 - Start Kafka Consumer:**
+    ```bash
+    cd kafka_consumer
+    python src/kafka_consumer.py
+    ```
+    Sample Output: Watch for faster processing times
+    ```bash
+    [6]: subject [163669001] timestamp [1738601222] actual glucose [120] expected glucose [104.7388606470258] timetaken 29999458
+    ```
+
+* **Terminal 4 - Start Historical Consumer:**
+    ```bash
+    cd kafka_consumer
+    python src/kafka_consumer.py --store offline
+    ```
+    Sample Output: Watch for slower processing times
+    ```bash
+    [6]: subject [163669001] timestamp [1738601222] actual glucose [120] expected glucose [103.5871450989212] timetaken 80960458
+    ```
+
+**Watch the outputs to see:**
+- Real-time glucose readings from the producer
+- Data flowing through both consumers
+- Performance difference between online (~26ms) and offline (~78ms) stores.
+
+#### Verifying Everything Works
    
-
-2. **Test Kafka Integration:**
-
-   - **Kafka Setup**
-      - Ensure your Kafka broker is running.
-      - Create the `cgm_readings` topic in Kafka.
-      - If auto.create.topics.enable=true, it is automatically created. Most typical setups have this.
+1. Watch the Data Flow:
+   - Producer terminal: New CGM readings every second
+   - Online Consumer terminal: Fast processing (~26ms)
+   - Historical Consumer terminal: Slower processing (~78ms)
    
-   - **Start Components**
+3. Success Criteria:
+   - All terminals showing regular output
+   - Online feature retrieval is faster than historical.The difference is much higher when you use a data warehouse like snowflake or bigquery.
+   - API endpoints returning expected data
 
-      - **Start Kafka Producer:**: This begins sending CGM events to Kafka and broadcasting them via WebSocket.
-        ```bash
-        cd kafka_producer
-        python src/kafka_producer.py
-        ```
-      
-
-      - **Start Kafka Consumer:**: This starts consuming events from Kafka, pushing data to Feast Online Store, reading from feast, and then predicting based on a model.
-        ```bash
-        cd kafka_consumer
-        python src/kafka_consumer.py
-        ```
-      
-      - **Start Kafka Consumer for Historical Data:**: This starts consuming events from Kafka, pushing data to Feast Offline Store, reading from feast, and then predicting based on a model.
-        ```bash
-        cd kafka_consumer
-        python src/kafka_consumer.py --store offline
-        ```
-     
-
-4. **Test Model Creation:**
-    -   Run `python model.py` to create the model in the model folder
-   You can change the name of the input parquet and the output model file within model.py
-        ```bash
-            cd kafka_consumer/src
-            python model.py
-        ```
-   
-
-## Run via Docker
+### Run via Docker
 
 #### Prerequisites
-The entire environment is configured within the Dockerfiles, so no installation is required here.
+The entire environment is configured within the Dockerfiles, so no installation is required.
 
-#### Configuration
+#### Steps (Each command needs its own terminal)
 
-For Docker environment, use the`feature_store.yaml`:
-
-```yaml
-project: cgm_ignite_feast_kafka
-registry: data/registry.db
-provider: local
-online_store:
-    type: feast_gridgain.ignite_online_store.IgniteOnlineStore
-    host: ignite
-    port: 10800
-entity_key_serialization_version: 2
-```
-
-Before starting the docker containers, create a network called cgm_network:
-
+Before starting any services, open a new terminal and create the network:
 ```bash
 docker network create cgm_network
 ```
 
-1. **Start the Kafka Container:**
+* **Terminal 1 - Start Kafka:**
     ```bash
     cd kafka
     docker-compose -p cgm_network up
     ```
+    Wait until you see Kafka startup messages complete.
 
-2. **Start the Ignite Container:**
+* **Terminal 2 - Start GridGain/Ignite:**
     ```bash
     cd ignite
     docker-compose -p cgm_network up
     ```
+    Wait for startup to complete
 
-3. **Start the API Container:**
+* **Terminal 3 - Start API Server:**
     ```bash
     cd api
     docker-compose -p cgm_network up
     ```
+    Wait until you see the Uvicorn startup message.
 
-4. **Start the Kafka Producer:**
-    - In the file Dockerfile.producer, ensure the ***--env*** is set to docker
+    Sample Output: You should see the logs when the consumers start sending data
+    ```bash
+    {'feature': 'get_online_features', 'layer': 'api', 'event': 'store.get_online_features', 'timetaken': 26442708, 'timetakeninmicro': 26442.708, 'timetakeninmillis': 26.442708}
+    {'feature': 'get_historical_features', 'layer': 'api', 'event': 'store.get_historical_features', 'timetaken': 78534292, 'timetakeninmicro': 78534.292, 'timetakeninmillis': 78.53429200000001}
+    ```
 
-      ```
-      CMD ["sh", "-c", "echo 'Starting producer script' && python kafka_producer.py --parquet-file-path data/cgm_stats.parquet --env docker --kafka-topic cgm_readings"]
-      ```
-    - Then run the producer, that will read data from the parquet file and push it to the kafka topic
-      ```bash
-      cd kafka_producer
-      docker-compose -p cgm_network up
-      ```
+* **Terminal 4 - Start Producer:**
+    ```bash
+    cd kafka_producer
+    docker-compose -p cgm_network up
+    ```
+    Sample Output: You should see CGM readings being generated
+    ```bash
+    6: {'event_timestamp': 1738601222, 'subject_id': 163669001, 'glucose': 120, 'created': 1738601222}
+    ```
 
-5. **Start the Kafka Consumer:**
-    - In the file Dockerfile.consumer,
-      - ensure the ***--env*** is set to docker
-      - ensure the ***--base-url*** is set to the url of the api container from point (3), It is typically http://cgm_network-feast_api-1:8000
+* **Terminal 5 - Start Online Consumer:**
+    ```bash
+    cd kafka_consumer
+    docker-compose -p cgm_network up
+    ```
+    Sample Output: Watch for faster processing times
+    ```bash
+    [6]: subject [163669001] timestamp [1738601222] actual glucose [120] expected glucose [104.7388606470258] timetaken 29999458
+    ```
 
-      ```bash
-      CMD ["sh", "-c", "echo 'Starting consumer script' && python kafka_consumer.py --store online --base-url http://cgm_network-feast_api-1:8000 --id-field subject_id --feature-service cgm_activity_v3 --env docker --kafka-topic cgm_readings --model-filepath model/glucose_prediction_model-v1.pkl"]
-      ```
-    - Then run the consumer, that will feed the data to the offline store
-      ```bash
-      cd kafka_consumer
-      docker-compose -p cgm_network up
-      ```
+* **Terminal 6 - Start Historical Consumer:**
+    ```bash
+    cd kafka_consumer
+    docker compose -p cgm_network -f docker-compose-historical.yml up
+    ```
+    Sample Output: Watch for slower processing times
+    ```bash
+    [6]: subject [163669001] timestamp [1738601222] actual glucose [120] expected glucose [103.5871450989212] timetaken 80960458
+    ```
 
-6. **Start the Kafka Consumer for Offline Stores:**
-    - In the file Dockerfile.historicalconsumer,
-      - ensure the ***--env*** is set to docker
-      - ensure the ***--base-url*** is set to the url of the api container from point (3), It is typically http://cgm_network-feast_api-1:8000
+**Watch the outputs to see:**
+- Real-time glucose readings from the producer
+- Data flowing through both consumers
+- Performance difference between online (~26ms) and offline (~78ms) stores.
 
-      ```bash
-      CMD ["sh", "-c", "echo 'Starting consumer script' && python kafka_consumer.py --store offline --base-url http://cgm_network-feast_api-1:8000 --id-field subject_id --feature-service cgm_activity_v3 --env docker --kafka-topic cgm_readings --model-filepath model/glucose_prediction_model-v1.pkl"]
-      ```
-    - Then run the historical consumer, that will feed the data to the offline store
+#### Verifying Everything Works
 
-      ```bash
-      cd kafka_consumer
-      docker compose -p cgm_network -f docker-compose-historical.yml up
-      ```
+1. Watch the Data Flow:
+   - Producer terminal: New CGM readings every second
+   - Online Consumer terminal: Fast processing (~26ms)
+   - Historical Consumer terminal: Slower but more complete processing (~78ms)
+
+3. Success Criteria:
+   - All terminals showing regular output
+   - Online feature retrieval is faster than historical.The difference is much higher when you use a data warehouse like snowflake or bigquery.
+   - API endpoints returning expected data
   
 #### Run on AWS
 
